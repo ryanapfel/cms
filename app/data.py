@@ -36,6 +36,7 @@ def retrieve(params, user, password):
     returnDict['prefs'] = engine.getPreferences()
     returnDict['client_titles'] = engine.getClientComps()
     returnDict['client_engagment'] = engine.getEngagement()
+    returnDict['demographics'] = engine.getDemographics()
     return returnDict
     
 
@@ -57,13 +58,34 @@ class Engine:
         return self.load(sql)
     
     def getRating(self):
-        sql = f"""SELECT media_item_id, mean, std, count 
-                  FROM `media_ratings` """
+        sql = f'''SELECT main.media_item_id, main.count, main.mean, main.std
+                FROM media_ratings main
+                JOIN (SELECT media_item_id, MAX(date_appended) as date FROM media_ratings GROUP BY media_item_id) sub
+                ON main.media_item_id = sub.media_item_id AND main.date_appended = sub.date
+                WHERE main.media_item_id IN (SELECT mi.media_item_id 
+                                            FROM media m 
+                                            INNER JOIN media_item mi 
+                                            ON mi.media_id = m.media_id 
+                                            WHERE m.client_id = (SELECT mm.client_id 
+                                                                FROM media mm 
+                                                                INNER JOIN media_item mmi ON mmi.media_id = mm.media_id 
+                                                                WHERE mmi.media_item_id = {self.id}));'''
         return self.load(sql)
 
     def getDemand(self):
-        sql = f"""SELECT media_item_id, mean, std, count 
-                  FROM `media_overall_demand` """
+        sql = f'''
+        SELECT main.media_item_id, main.count, main.mean, main.std
+        FROM media_demand main
+        JOIN (SELECT media_item_id, MAX(date_appended) as date FROM media_demand GROUP BY media_item_id) sub
+        ON main.media_item_id = sub.media_item_id AND main.date_appended = sub.date
+        WHERE main.media_item_id IN (SELECT mi.media_item_id 
+                                    FROM media m 
+                                    INNER JOIN media_item mi 
+                                    ON mi.media_id = m.media_id 
+                                    WHERE m.client_id = (SELECT mm.client_id 
+                                                        FROM media mm 
+                                                        INNER JOIN media_item mmi ON mmi.media_id = mm.media_id 
+                                                        WHERE mmi.media_item_id = {self.id}))'''
         return self.load(sql)
     
     def getPreferences(self):
@@ -89,6 +111,10 @@ class Engine:
                   ORDER BY release_date DESC;'''
         return self.load(sql)
 
+    '''
+    Query gets the most recent engagement data (updated daily) for every title that shares 
+    the same client as the target title (self.id)
+    '''
     def getEngagement(self):
         sql=f'''SELECT main.media_item_id, main.percentile, main.count, main.normalized
             FROM media_engagement main
@@ -105,3 +131,18 @@ class Engine:
                                                 WHERE mmi.media_item_id = {self.id}));'''
         return self.load(sql)                                        
     
+    def getDemographics(self):
+        sql = f'''
+        SELECT main.*
+        FROM media_demographics main
+        JOIN (SELECT media_item_id, MAX(date_appended) as date FROM media_demographics GROUP BY media_item_id) sub
+        ON main.media_item_id = sub.media_item_id AND main.date_appended = sub.date
+        WHERE main.media_item_id IN (SELECT mi.media_item_id 
+                                    FROM media m 
+                                    INNER JOIN media_item mi 
+                                    ON mi.media_id = m.media_id 
+                                    WHERE m.client_id = (SELECT mm.client_id 
+                                                        FROM media mm 
+                                                        INNER JOIN media_item mmi ON mmi.media_id = mm.media_id 
+                                                        WHERE mmi.media_item_id = {self.id}));'''
+        return self.load(sql)                                                                                                            
