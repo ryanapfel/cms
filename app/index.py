@@ -14,13 +14,20 @@ from urllib.parse import urlparse, parse_qsl, urlencode
 from data import retrieve
 from secretVars import *
 from components.navbar import buildNavbar, staticNavbar
-from components.overview import buildOverview
+from components.overview import buildOverview, graphOverviewHisto, graphComparison
+from components.demographic import buildDemographic, demoBar
 from components.engagement import buildEngagement, addTitleToEngage
+from dash.exceptions import PreventUpdate
+import plotly.io as pio
 import json
+
+
+pio.templates.default = "ggplot2"
 
 USER = ML_DB_USER
 PASS = ML_DB_PASSWORD
-DEBUG = True
+PRODUCTION = False
+DEBUG = not PRODUCTION 
 
 server = flask.Flask(__name__) # define flask app.server
 
@@ -85,8 +92,6 @@ def parse_state(url):
 @app.callback(Output('store', 'data'),
               Input('url', 'href'))
 def getData(href):
-    if not href:
-        return {}
     state = parse_state(href)
 
     # only run expensive data retrieve if the correct url format is passed
@@ -101,25 +106,22 @@ def getData(href):
               Input('store','data'))
 def getLayout(data):
     debug = DEBUG
-    if 'exists' in data and data['exists']:
+    try:
         layout = [
-            buildNavbar(data),
-            buildOverview(data),
-            buildEngagement(data)
-        ]
-    elif 'exists' in data and not data['exists']:
-        layout = [
-            staticNavbar('Volkno'),
-            dbc.Alert("Media Item doesn't exists in our records", color="warning", is_open=True, duration=4000, fade=True),
-        ]
-    else:
+                buildNavbar(data),
+                buildOverview(data),
+                buildEngagement(data),
+                # buildDemographic(data)
+            ]
+
+        return layout
+    except Exception as e:
         layout = [
             staticNavbar('Volkno'),
-            dbc.Alert("URL format is invalid", color="danger", is_open=True, duration=3000, fade=True),
+            dbc.Alert(f"{e}", color="danger", is_open=True, duration=5000, fade=True),
         ]
-    if debug:
-        layout.append(html.Pre(json.dumps(data, indent=4)))
-    return layout
+        return layout
+
 
     
 @app.callback(Output('engagement-graph', 'figure'),
@@ -129,20 +131,39 @@ def getLayout(data):
 def engagementCallback(data, value):
     return addTitleToEngage(data, value)
 
+@app.callback(Output('rating-histogram', 'figure'),
+              Input('store','data'),
+              Input('overview-update','value'),
+              prevent_initial_call=True)
+def engagementCallback(data, value):
+    return graphOverviewHisto(data, value)
+
+
+@app.callback(Output('rating-comparisons', 'figure'),
+              Input('store','data'),
+              Input('overview-update','value'),
+              prevent_initial_call=True)
+def engagementCallback(data, value):
+    return graphComparison(data, value)
+
+
+
+
+
+
+@app.callback(Output('demo-eth-bar', 'figure'),
+              Input('store','data'),
+              Input('demographic-dropdown','value'),
+              prevent_initial_call=True)
+def engagementCallback(data, value):
+    return demoBar(data, value, 'ethnicity')
+
+    
+
+
 
 if __name__ == "__main__":
-    app.run_server(debug=True, host='0.0.0.0', port=8050)
-
-
-
-
-            # apply_default_value(params)(dcc.Dropdown)(
-        #     id='dropdown',
-        #     options=[{'label': i, 'value': i} for i in ['LA', 'NYC', 'MTL']],
-        #     value='LA'
-        # ),
-        # apply_default_value(params)(dcc.Input)(
-        #     id='input',
-        #     placeholder='Enter a value...',
-        #     value=''
-        # ),
+    if PRODUCTION:
+        app.run_server(debug=True)
+    else:
+        app.run_server(debug=True, host='0.0.0.0', port=8050)

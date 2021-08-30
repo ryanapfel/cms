@@ -30,10 +30,9 @@ def staticNavbar(title):
 
 def buildNavbar(data, debug=False):
     title = getMediaTitle(data)
-    if title:
+    try:
         return staticNavbar(title)
-    else:
+    except Exception as e:
         comp = staticNavbar('Volkno Dashboard')
-        comp.append(alert('Title error'))
         return comp
         

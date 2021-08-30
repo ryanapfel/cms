@@ -35,7 +35,7 @@ def alert(message, color='warning'):
 
 def blankFig(message):
     fig = go.Figure().add_annotation(x=2, y=2,text=message,
-                                        font=dict(family="sans serif",size=25,color="crimson"),showarrow=False,yshift=10)
+                                        font=dict(size=10,color="red"),showarrow=False,yshift=10)
     return fig
 
 
@@ -63,3 +63,46 @@ def card(**args):
     ))
 
     return cardBody
+
+def getTitleComps(data, componentId):
+    df = parseData('client_titles', data)
+    titles = []
+    if not df.empty:
+        for idx, row in df.iterrows():
+            tDict = {}
+            t = row['title']
+            i = row['media_item_id']
+            tDict['label'] = f'{t} ({i})'
+            tDict['value'] = i
+            titles.append(tDict)
+    
+    component = dcc.Dropdown(
+        id=componentId,
+        options=titles,
+        value=[],
+        multi=True
+    )
+    return component
+    
+
+def getConfig():
+    return {
+			'displayModeBar':False,
+			'queueLength':0
+    }
+
+
+def getGraph(id, figFunction):
+    return dcc.Graph(id=id, config={'displayModeBar':False,'queueLength':0}, figure=figFunction)
+
+
+
+def dash_figure(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            return blankFig(f'{func.__name__} : {e}')
+            ## ADD LOGGER
+    return wrapper 
+

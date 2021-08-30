@@ -11,7 +11,7 @@ def buildEngagement(data):
             dbc.CardBody([
                 dbc.Row([dbc.Col([
                     html.P('Select Titles to Compare'),
-                    getTitleComps(data)
+                    getTitleComps(data, 'engagement-dropdown')
                     ], align='end', width='3')]),
                 dbc.Row([
                     dbc.Col([dcc.Graph(id="engagement-graph", figure=plotEngagement(data))], md=12)
@@ -21,19 +21,6 @@ def buildEngagement(data):
     
     return component
 
-def getTitleComps(data):
-    df = parseData('client_titles', data)
-    titles = []
-    if not df.empty:
-        titles = [{'label':row['title'], 'value':row['media_item_id']}for idx, row in df.iterrows()]
-    
-    component = dcc.Dropdown(
-        id='engagement-dropdown',
-        options=titles,
-        value=[],
-        multi=True
-    )
-    return component
     
 def plotEngagement(data, returnDf = False):
     dataName = 'client_engagment'
@@ -48,15 +35,15 @@ def plotEngagement(data, returnDf = False):
 
     fig = go.Figure()
     
-    dff = df.groupby('percentile').mean().reset_index()[['percentile', 'count','normalized']]
-    fig.add_trace(go.Scatter(x=dff['percentile'],
-                             y=dff['normalized'], 
-                             name='Average', 
-                             mode='lines', line={'dash': 'dash', 'color':'black'}))
+    # dff = df.groupby('percentile').mean().reset_index()[['percentile', 'count','normalized']]
+    # fig.add_trace(go.Scatter(x=dff['percentile'],
+    #                          y=dff['normalized'], 
+    #                          name='Average', 
+    #                          mode='lines', line={'dash': 'dash', 'color':'black'}))
     
     dff = df[df['media_item_id'] == mediaItem]
     fig.add_trace(go.Scatter(x=dff['percentile'], 
-                             y=dff['normalized'], 
+                             y=dff['normalized'].interpolate(), 
                              name=f'{itemTitle}', 
                              mode='lines',
                              line={'width':3}))
@@ -75,7 +62,11 @@ def addTitleToEngage(data, mediaIdToAdd):
     for items in mediaIdToAdd:
         dff = df[df['media_item_id'] == items]
         title = titlesDf[titlesDf['media_item_id'] == items]['title'].item()
-        fig.add_trace(go.Scatter(x=dff['percentile'], y=dff['normalized'], name=f'{title}'))
+        fig.add_trace(go.Scatter(x=dff['percentile'], 
+                                 y=dff['normalized'].interpolate(), 
+                                 name=f'{title}',
+                                 mode='lines',
+                                 line={'width':2, 'dash':'solid'}))
 
     return fig
 
