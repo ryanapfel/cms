@@ -20,26 +20,15 @@ def validMediaId(params, user, password):
         return False
 
 
-def retrieve(params, user, password):
+def retrieve(mediaId, client , user, password):
     try:
 
         returnDict = {}
 
-        # we need this for anything if not here it should fail
-        mediaId = params['mediaId']
- 
-        if 'clientId' in params:
-            if int(params['clientId']) == 9:
-                clientId = 1
-            else:
-                clientId = params['clientId']
-        else:
-            # default is to show volkno data
-            clientId = 1
-        
-        print(mediaId, clientId, type)
-        engine = Engine(mediaId, clientId, user, password)
+        engine = Engine(mediaId, client, user, password)
         # get title
+        returnDict['mediaId'] = mediaId
+        returnDict['client'] = client
         returnDict['exists'] = engine.mediaItemExists()
         returnDict['title'] = engine.getTitle()
         returnDict['allRatings'] = engine.getAllRatings()
@@ -64,7 +53,8 @@ class Engine:
         else:
             return pd.read_sql(sql, self.engine)
 
-    def getClientAndSelf(self, limit=1000):
+    def getClientAndSelf(self, limit=False):
+        limit = f'''LIMIT {limit}''' if limit else ''
         sql = f''' SELECT mmm.media_item_id 
                 FROM media_item mmm 
                 WHERE mmm.media_item_id = {self.id}
@@ -75,7 +65,7 @@ class Engine:
                 ON mi.media_id = m.media_id 
                 WHERE m.client_id = {self.clientId}
                 ORDER BY media_item_id DESC
-                LIMIT {limit})
+                {limit})
                 ORDER BY 1 DESC
                 '''
         return sql
@@ -167,22 +157,13 @@ class Engine:
         return self.load(sql)                                                                                                            
     
     def getAllRatings(self):
-        subquery = f'''SELECT mi.media_item_id, m.release_date
-        FROM media m 
-        INNER JOIN media_item mi 
-        ON mi.media_id = m.media_id 
-        WHERE m.client_id = (SELECT mm.client_id 
-        FROM media mm 
-        INNER JOIN media_item mmi ON mmi.media_id = mm.media_id 
-        WHERE mmi.media_item_id = {self.id}) 
-        ORDER BY m.release_date DESC
-        LIMIT 50
-        ''' 
         sql = f'''
-        SELECT main.media_item_id, main.`overall-rating`
+        SELECT main.media_item_id, main.`overall-rating`, main.user_id, raw.ethnicity, raw.sex, raw.income
         FROM raw_ratings main
-        JOIN ({subquery}) sub
+        JOIN ({self.getClientAndSelf(limit=100)}) sub
         ON sub.media_item_id = main.media_item_id
+        JOIN raw_user raw
+        ON main.user_id = raw.user_id
         '''
         return self.load(sql)            
 

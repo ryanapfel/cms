@@ -39,50 +39,50 @@ def blankFig(message):
     return fig
 
 
-def card(**args):
+def displayValue(**args):
     value = args['value']
     title = args['title']
     icon = 'fas fa-shield-alt fa-2x'
     
-    cardBody = dbc.Card( dbc.CardBody( [
-        dbc.Row([
-        dbc.Col([
-        html.P(
-            title,
-            className="card-text",
-        ),
-        html.H2(f'{round(value, 2)}', className="card-title"),
+    component = html.Div([
+            dbc.Row(html.P(title)),
+            dbc.Row(html.H3(round(value, 2)))
+        ], className='p-3')
 
-        ], md=9),
+    return component
 
-            dbc.Col([
-        html.I(className=icon),
-
-        ], md=3),
-    ], align='center')]
-    ))
-
-    return cardBody
-
-def getTitleComps(data, componentId):
+def getTitleComps(data, componentId, mediaItems=[]):   
     df = parseData('client_titles', data)
-    titles = []
-    if not df.empty:
-        for idx, row in df.iterrows():
-            tDict = {}
-            t = row['title']
-            i = row['media_item_id']
-            tDict['label'] = f'{t} ({i})'
-            tDict['value'] = i
-            titles.append(tDict)
-    
+    itemms = mediaItems if mediaItems else list(df['media_item_id'].unique())
+    dff = df[df['media_item_id'].isin(itemms)][['title', 'media_item_id']]
+    dff.rename(columns={'title':'label', 'media_item_id':'value'}, inplace=True)
+    options = dff.to_dict(orient='records')
+
     component = dcc.Dropdown(
         id=componentId,
-        options=titles,
+        options=options,
         value=[],
         multi=True
     )
     return component
+
+# def getTitleComps(data, componentId, mediaItems=[]):
+#     try:
+#         df = parseData('client_titles', data)
+#         itemms = mediaItems if mediaItems else df['media_item_id'].unique() 
+#         dff = df[df['media_item_id'].isin(itemms)][['title', 'media_item_id']]
+#         dff.rename(columns={'title':'label', 'media_item_id':'value'}, inplace=True)
+#         options = dff.to_dict(orient='records')
+            
+#         component = dcc.Dropdown(
+#             id=componentId,
+#             options=titles,
+#             value=[],
+#             multi=True
+#         )
+#         return component
+#     except Exception as e:
+#         return html.P(str(e))
     
 
 def getConfig():
@@ -95,6 +95,14 @@ def getConfig():
 def getGraph(id, figFunction):
     return dcc.Graph(id=id, config={'displayModeBar':False,'queueLength':0}, figure=figFunction)
 
+def getGraphCard(graphId, graphFunction, title='', tooltip=''):
+    comp = dbc.Card([dbc.CardBody([dbc.Row(dbc.Col(html.H6(title))),
+                                    dbc.Row(dbc.Col(getGraph(id=graphId, figFunction=graphFunction)))
+                                   ])
+                    ])
+                                    
+    return comp
+
 
 
 def dash_figure(func):
@@ -105,4 +113,15 @@ def dash_figure(func):
             return blankFig(f'{func.__name__} : {e}')
             ## ADD LOGGER
     return wrapper 
+
+
+def data_component(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            return dcc.Div(hml.P(f'{e}'))
+            ## ADD LOGGER
+    return wrapper 
+
 
