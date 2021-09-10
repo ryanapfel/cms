@@ -39,18 +39,6 @@ def blankFig(message):
     return fig
 
 
-def displayValue(**args):
-    value = args['value']
-    title = args['title']
-    icon = 'fas fa-shield-alt fa-2x'
-    
-    component = html.Div([
-            dbc.Row(html.P(title)),
-            dbc.Row(html.H3(round(value, 2)))
-        ], className='p-3')
-
-    return component
-
 def getTitleComps(data, componentId, mediaItems=[]):   
     df = parseData('client_titles', data)
     itemms = mediaItems if mediaItems else list(df['media_item_id'].unique())

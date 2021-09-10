@@ -42,32 +42,12 @@ def initialDrop():
 
 def staticNavbar(title):
 
-    component = dbc.Navbar(
-        children=[
-            html.A(
-                # Use row and col to control vertical alignment of logo / brand
-                dbc.Row(
-                    dbc.Col(dbc.NavbarBrand(f"{title} Dashboard", className="ml-2"), width=3),
-                    align="center",
-                    no_gutters=True,
-                ),
-                href="https://cms2.volkno.com",
-            ),
-            dbc.Row(
-            [
-                dbc.Col(html.Div(initialDrop(), style={'width':'200px'})),
+    component = html.Div([
+        dbc.Row([
+            dbc.Col(html.Div(initialDrop(), style={'width':'200px'})),
+        ])
+    ], className='p-3')
 
-            ],
-        no_gutters=True,
-        className="ml-auto flex-nowrap mt-3 mt-md-0",
-        align="center",
-    )
-           
-        ],
-        color="dark",
-        dark=True,
-        sticky="top",
-    )
     return component
 
 def dynamic(title, client):

@@ -47,6 +47,7 @@ class Engine:
         self.id = id
         self.clientId = clientId
         self.engine = sqlalchemy.create_engine(f"mysql+pymysql://{user}:{password}@mysql/ml")
+
     def load(self, sql, serialize=True):
         if serialize:
             return pd.read_sql(sql, self.engine).to_json()
@@ -71,7 +72,7 @@ class Engine:
         return sql
     
     def getTitle(self):
-        sql = f"""SELECT media.`media_id`,`media_type_id`,`client_id`,`title`,`release_date` , media_item.media_item_id
+        sql = f"""SELECT media.`media_id`,`media_type_id`,`client_id`,`title`,`release_date` , media_item.media_item_id, media_item.url_1
                   FROM `media` INNER JOIN media_item 
                   ON media.media_id = media_item.media_id 
                   WHERE media_item_id = {self.id};"""
@@ -119,12 +120,13 @@ class Engine:
         df = self.load(sql, serialize=False)
         return df['exists'].item()
         
-    def getClientComps(self):
+    def getClientComps(self, limit=False):
+        limit = limit if limit else False
         sql = f'''SELECT m.title, m.media_id, mi.media_item_id, m.release_date 
                   FROM media m 
                   INNER JOIN media_item mi 
                   ON mi.media_id = m.media_id 
-                  WHERE mi.media_item_id IN (SELECT * FROM ({self.getClientAndSelf()}) as v1);'''
+                  WHERE mi.media_item_id IN (SELECT * FROM ({self.getClientAndSelf(limit)}) as v1);'''
         return self.load(sql)
 
 
@@ -132,14 +134,35 @@ class Engine:
     Query gets the most recent engagement data (updated daily) for every title that shares 
     the same client as the target title (self.id)
     '''
-    def getEngagement(self):
+    def getEngagementOld(self):
         sql=f'''SELECT main.media_item_id, main.percentile, main.count, main.normalized
             FROM media_engagement main
             JOIN (SELECT media_item_id, MAX(date_appended) as date FROM media_engagement GROUP BY media_item_id) sub
             ON main.media_item_id = sub.media_item_id AND main.date_appended = sub.date
-            WHERE main.media_item_id IN (SELECT * FROM ({self.getClientAndSelf()}) as v1);'''
+            WHERE main.media_item_id IN (SELECT * FROM ({self.getClientAndSelf(limit=250)}) as v1);'''
         return self.load(sql)                                        
     
+    def getEngagement(self):
+        sql = f'''SELECT  media_item_id, percentile, count, normalized
+                  FROM media_engagement 
+                  WHERE date_appended >= (SELECT DATE(MAX(date_appended)) as day FROM media_engagement) 
+                  AND media_item_id IN (SELECT * FROM ({self.getClientAndSelf(limit=250)}) as v1)'''
+        return self.load(sql)
+
+    def getScenes(self):
+        sql = f'''SELECT * 
+                FROM media_scenes
+                WHERE media_item_id IN (SELECT * FROM ({self.getClientAndSelf(250)}) as temp)
+                '''
+        return self.load(sql)
+        
+    def getRawEngagement(self):
+        sql = f'''SELECT user_id, meta_value, meta_key, timestamp 
+                  FROM raw_responses 
+                  WHERE media_item_id = {self.id}'''
+        return self.load(sql)
+
+
     def getDemographics(self):
         sql = f'''
         SELECT main.*

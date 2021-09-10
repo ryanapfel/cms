@@ -5,250 +5,121 @@ import plotly.express as px
 import pandas as pd
 import dash_table
 from  components.utils import *
+from components.contained import CMSComponent
 
 
-@data_component
-def header(title):
-    comp = dbc.Row(dbc.Col(html.H4(f'{title} Overview')))
-    return comp
 
 
-@data_component
-def secondHeader(data, title):
-    mediaIds = list(parseData('allRatings', data)['media_item_id'].unique())
+class OverivewStats(CMSComponent):
+    def __init__(self, globalParams):
+        super().__init__('overview-card', globalParams)
     
-    comp = dbc.Row([
-        dbc.Col(html.H4(f'{title} Rating Comparables')),
-        dbc.Col(getTitleComps(data, 'overview-update', mediaItems=mediaIds), md=3)
-        ], className='p-4')
-    return comp
+    def load(self, data):
+        self.demand = pd.read_json(data['demand'])
+        self.overall = pd.read_json(data['rating'])
     
-def overview(data):
-    card = dbc.Card([
-                    dbc.CardBody([
-                    dbc.Row(dbc.Col(overviewCard(data, 'demand', 'demand','Demand Average'))),
-                    dbc.Row(dbc.Col(overviewCard(data, 'rating', 'rating','Overall Rating Average'))),
-                    dbc.Row(dbc.Col(overviewCard(data, 'rating', 'count','Count of Ratings'))) 
-                    ], className='p-3'),
-                    
-                    ])
-    return card
+
+    def transform(self):
+        self.demand = self.demand[self.demand['media_item_id' ] == self.id]
+        self.overall = self.overall[self.overall['media_item_id'] == self.id]
+
+        data = {}
+        data['overall'] = {'value': self.overall['mean'].item(),  'title': 'Average Overall Rating'}
+        data['demand'] = {'value': self.demand['mean'].item(),  'title': 'Average Demand Rating'}
+        data['count'] = {'value': self.overall['count'].item(),  'title': 'Number of Ratings'}
 
 
-
-
-
-
-def buildOverview(data):
-    title = getMediaTitle(data)
-
-    component = html.Div([
-        header(title),
+        self.data = data
     
-        dbc.Row([
-            dbc.Col(overview(data), md=2),
-            dbc.Col(getGraphCard(graphId='demand', 
-                                graphFunction= ratingHistogram(data, 'demand', ''), 
-                                title='Distribution of Demand'
-                                ) ,md=5) ,           
-            dbc.Col(getGraphCard(graphId='rating', 
-                                graphFunction= ratingHistogram(data, 'rating', ''), 
-                                title='Distribution of Ratings'
-                                ) ,md=5)
-        ]),
-        secondHeader(data, title),
-        dbc.Row([
-                dbc.Col(getGraphCard(graphId='rating-histogram', 
-                                    graphFunction=graphOverviewHisto(data, []),
-                                    title=f'Distribution Of {title} Ratings'), md=6),
-                dbc.Col(getGraphCard(graphId='rating-comparisons', 
-                                    graphFunction=graphComparison(data, []),
-                                    title='Rating Percentile'), md=6)
-        ]),
-        dbc.Row([
-            dbc.Col([
-                dbc.Card([
-                html.H5('Demographic Breakdonwn'),
-                html.Pre(id='data-table', children=[]),
-                dcc.Graph(id='ethnicity-comparable-rating')
-                ])
-            ])
-        ])
+    def displayValue(self, value, title):
+        return html.Div([
+                dbc.Row(html.P(title)),
+                dbc.Row(html.H3(round(value, 2)))
+            ], className='p-3')
+
+    def display(self):
+        components = [
+            self.displayValue(value=self.data['overall']['value'], 
+                         title=self.data['overall']['title']),
+            self.displayValue(value=self.data['demand']['value'], 
+                         title=self.data['demand']['title']),
+            self.displayValue(value=self.data['count']['value'], 
+                         title=self.data['count']['title']),
+        ]
+        kids = html.Div(id=self.componentId, children=components)
+
+        return self.card(title='', children=kids)
 
 
+
+
+class OverviewHistogram(CMSComponent):
+    def __init__(self, dataName, globalParams):
+        super().__init__(f'overview-histo-{dataName}', globalParams)
+        self.dataName = dataName
+    
+    def transform(self):
+        currentItem = self.df[self.df['media_item_id'] == self.id]
+        self.itemMean = currentItem['mean'].item()
+        self.df = self.df.loc[: , 'mean']
+        self.allMean = self.df.mean()
+    
+    def display(self):
+        fig = (px.histogram(self.df, x="mean")
+            .update_layout(title_font_size=24)
+            .add_vline(x=self.itemMean, line_width=4, annotation_text=f' {self.mediatitle} Rating',  annotation_textangle=-90)
+            .add_vline(x=self.allMean, line_width=2, line_color="black", line_dash="dot", annotation_text='Average Rating', annotation_textangle=-90)
+            .update_xaxes(title='Rating')
+            .update_yaxes(title='Number of Titles'))
         
-                                
-             
-        
-                #     dbc.Col([getGraph(id='rating', figFunction=ratingHistogram(data, 'rating', 'Distribution of Overall Ratings'))], md=6), 
-                    
-
-                # # dbc.Row([
-                # #     dbc.Col([dcc.Graph(id="platform-prefs", figure=graphPrefs(data, title='Platform Preferences (top 5)'))], md=12)
-                # # ]),
-                #     dbc.Row([
-                # ]),
-                #     
-        ], className='p-3')
- 
-    return component
-
-
-@dash_figure
-def demoFiltrtedComps(data, minRating, maxRating):
-    dataName = 'allRatings'
-    titlesDf = parseData('client_titles', data)
-    df = parseData(dataName, data)
-    mediaItem = getMediaItemId(data)
-    itemTitle = getMediaTitle(data)
-
-    dff = df[(df['overall-rating'] > minRating) & (df['overall-rating'] < maxRating)]
-
-    fig = go.Figure()
-
-    key='ethnicity'
-
-    vals = dff[dff['media_item_id'] == mediaItem][key].value_counts()
-    fig.add_trace(go.Bar(name=itemTitle, x=vals.index, y=vals.values))
-
-    # for item in titles:
-    #     vals = dff[dff['media_item_id'] == item][key].value_counts(normalize=True)
-    #     title = titlesDf[titlesDf['media_item_id'] == item]['title'].item()
-    #     fig.add_trace(go.Bar(name=title, x=vals.index, y=vals.values))
+        graph = self.graph(id=self.componentId, figFunction=fig)
+        return self.card(title=f'Distribution of {self.dataName.capitalize()}', children=graph)
     
-    return fig 
 
-@dash_figure
-def ratingHistogram(data, dataType, title):
-    dataName = dataType
-    df = parseData(dataName, data)
-    mediaItem = getMediaItemId(data)
-    itemTitle = getMediaTitle(data)
-    currentItem = df[df.media_item_id == mediaItem]
-    itemMean = currentItem['mean'].item()
-    df = df.loc[: , 'mean']
-    allMean = df.mean()
+class OverviewPrefs(CMSComponent):
+    def __init__(self, nPrefs , globalParams):
+        super().__init__('overview-prefrences', globalParams)
+        self.dataName = 'prefrences'
+        self.top = nPrefs
     
-    fig = (px.histogram(df, x="mean", title=title)
-    .update_layout(title_font_size=24)
-    .add_vline(x=itemMean, line_width=4, annotation_text=f'{itemTitle} rating',  annotation_textangle=-90)
-    .add_vline(x=allMean, line_width=2, line_color="black", line_dash="dot", annotation_text='Average Rating', annotation_textangle=-90)
-    .update_xaxes(title='Rating')
-    .update_yaxes(title='Number of Titles'))
-
-    return fig
-
-
-
-
-def overviewCard(data, dataName, cardType ,title):
-    df = parseData(dataName, data)    
-    try:
-        mediaItem = getMediaItemId(data)
-        df = df[df.media_item_id == mediaItem]
-
-        mean = df['mean'].item()
-        std = df['std'].item()
-        count = df['count'].item()
-
-        if cardType == 'demand' or cardType == 'rating':
-            value = mean
-        elif cardType == 'count':
-            value = count
-
-        return displayValue(value=value, title=title)
+    def transform(self):
+        self.df = self.df.iloc[:self.top].reset_index()
     
-    except:
-        return displayValue(value=0, title=title)
-
-
-@dash_figure
-def graphPrefs(data, title):
-    top = 5
-    dataName = 'prefs'
-    df = parseData(dataName, data)
-    df = df.iloc[:top].reset_index()
-    fig = (px.bar(df, y='platform', x='count', orientation='h')
-    .update_layout(barmode='stack',  yaxis_categoryorder='total ascending',title=title))
-    fig.update_layout({'xaxis': {'title': 'Votes',
+    def display(self):
+        fig = (px.bar(self.df, y='platform', x='count', orientation='h')
+        .update_layout(barmode='stack',  yaxis_categoryorder='total ascending'))
+        fig.update_layout({'xaxis': {'title': 'Votes',
                         'visible': True,
                         'showticklabels': True},
                         'yaxis': {'title': '',
                                     'visible': True,
                                     'showticklabels': True}})
-    
                                 
-    return fig
+        graph = self.graph(id=self.componentId, figFunction=fig)
+        return self.card(title=f'Platform Prefrences', children=graph)
+
+
+
+def Overview(data, params):
+    stats = OverivewStats(params)
+    demand = OverviewHistogram('demand', params)
+    rating = OverviewHistogram('rating', params)
+    prefs = OverviewPrefs(5, params)
+
+
+    component = html.Div([    
+        dbc.Row([
+            dbc.Col(stats.show(data), md=2),
+            dbc.Col(demand.show(data) ,md=5) ,           
+            dbc.Col(rating.show(data) ,md=5) ,           
+        ]),
+        dbc.Row([
+            dbc.Col(prefs.show(data), md=5)
+        ])
+    ], className='p-3')
+ 
+    return component
 
 
 
 
-
-
-# there will be a bug for now where its possible the possible options wont line up 
-@dash_figure
-def graphOverviewHisto(data, comparisonId=[]):
-    dataName = 'allRatings'
-    titlesDf = parseData('client_titles', data)
-    df = parseData(dataName, data)
-    mediaItem = getMediaItemId(data)
-    itemTitle = getMediaTitle(data)
-    
-
-    fig = go.Figure()
-    dff = df[df['media_item_id'] == mediaItem] 
-    fig.add_trace(go.Histogram(x=dff['overall-rating'],customdata=dff['user_id'],  name=itemTitle, nbinsx=40))
-
-    for item in comparisonId:
-        dff = df[df['media_item_id'] == item]
-        title = titlesDf[titlesDf['media_item_id'] == item]['title'].item()
-        fig.add_trace(go.Histogram(x=dff['overall-rating'],customdata=dff['user_id'],  name=title, nbinsx=40))
-
-    # Overlay both histograms
-    fig.update_layout(barmode='overlay', legend=dict(
-                                            orientation="h",
-                                            yanchor="bottom",
-                                            y=1.02,
-                                            xanchor="right",
-                                            x=1
-                                        ), dragmode='select')
-    # Reduce opacity to see both histograms
-    fig.update_traces(opacity=0.50)
-    return fig
-
-
-
-
-
-@dash_figure
-def graphComparison(data, items=[]):
-
-    titlesDf = parseData('client_titles', data)
-    rating = parseData('rating', data)
-    demand = parseData('demand', data)
-    mediaItem = getMediaItemId(data)
-    itemTitle = getMediaTitle(data)
-    items.append(mediaItem) 
-    
-    rows = []
-    for item in items:
-        title = titlesDf[titlesDf['media_item_id'] == item]['title'].item()
-        percentile = rating[rating['media_item_id'] == item ]['mean_percentile'].item()
-        size = rating[rating['media_item_id'] == item ]['count_rank'].item()
-        # TODO:  size should be inverted -- smaller number is actually larger
-        rows.append([title, 'rating', percentile , size])
-        
-        percentile = demand[demand['media_item_id'] == item ]['mean_percentile'].item()
-        size = demand[demand['media_item_id'] == item ]['count_rank'].item()
-        rows.append([title,'demand', percentile , size])
-
-        
-        
-
-    graphDf = pd.DataFrame(rows, columns=['Title','type','Percentile','size'])
-    fig = px.scatter(graphDf, y='type', x='Percentile', color='Title', size='size')
-    return fig
-
-
-
-    
