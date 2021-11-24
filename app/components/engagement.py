@@ -86,11 +86,11 @@ class Video(CMSComponent):
     def load(self, data):
         self.mediatitle = pd.read_json(data["title"])["title"].item()
         self.df = pd.read_json(data[self.dataName])
-        self.scenes = pd.read_json(data["scenes"])
+        self.video = pd.read_json(data["video_info"])
 
     def transform(self):
         self.url = self.df[self.df["media_item_id"] == self.id]["url_1"].item()
-        length = self.scenes[self.scenes["media_item_id"] == self.id]["end"].max()
+        length = self.video[self.video["media_item_id"] == self.id]["duration"].item()
 
         if np.isnan(length):
             self.start = 0
@@ -181,13 +181,13 @@ class EmotionGraph(CMSComponent):
 
         self.mediatitle = pd.read_json(data["title"])["title"].item()
         self.df = pd.read_json(data[self.dataName])
-        self.scenes = pd.read_json(data["scenes"])
+        self.video = pd.read_json(data["video_info"])
 
     def transform(self):
-        length = self.scenes[self.scenes["media_item_id"] == self.id]["end"].max()
+        length = self.video[self.video["media_item_id"] == self.id]["duration"].item()
 
         if np.isnan(length):
-            length = self.df["timestamp"].max()
+            length = 5000
 
         self.start = int(length * (self.minPercent / 100))
         self.end = int(length * (self.maxPercent / 100))
@@ -227,6 +227,7 @@ class EmotionGraph(CMSComponent):
             fig.update_layout(
                 yaxis_title="Difference From Expectation",
                 xaxis_title="",
+                xaxis={"categoryorder": "total descending"},
                 showlegend=False,
                 coloraxis_showscale=False,
             )

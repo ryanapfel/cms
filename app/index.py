@@ -7,9 +7,9 @@ import pandas as pd
 from dash.dependencies import Input, Output
 import plotly.graph_objects as go
 import numpy as np
-from urllib.parse import urlparse, parse_qsl, urlencode
+from urllib.parse import urlparse, parse_qsl, urlencode, quote_plus
 from data import retrieve, Engine
-from secretVars import *
+from secretVars import ML_DB_USER, ML_DB_PASSWORD, ML_DB_HOST, ML_DB_DB
 from components.navbar import (
     buildNavbar,
     staticNavbar,
@@ -27,8 +27,7 @@ from components.template import template
 
 template()
 
-USER = ML_DB_USER
-PASS = ML_DB_PASSWORD
+
 PRODUCTION = False
 DEBUG = not PRODUCTION
 
@@ -124,10 +123,12 @@ def getData(loadingState):
     mediaId = int(loadingState["mediaId"])
     client = int(loadingState["clientId"])
     view = loadingState["view"]
-
     returnDict = {}
 
-    engine = Engine(mediaId, client, USER, PASS)
+    password = quote_plus(ML_DB_PASSWORD)
+    queryString = f"mysql+pymysql://{ML_DB_USER}:{password}@{ML_DB_HOST}/{ML_DB_DB}"
+
+    engine = Engine(mediaId, client, queryString)
     # get title
     returnDict["mediaId"] = mediaId
     returnDict["client"] = client
@@ -147,7 +148,8 @@ def getData(loadingState):
     if view == "engagement":
         returnDict["client_engagment"] = engine.getEngagement()
         returnDict["client_titles"] = engine.getClientComps(250)
-        returnDict["scenes"] = engine.getScenes()
+        # returnDict["scenes"] = engine.getScenes()
+        returnDict["video_info"] = engine.getVideoInfo()
         returnDict["mediaRawEngagement"] = engine.getRawEngagement()
 
     # returnDict['exists'] = engine.mediaItemExists()
