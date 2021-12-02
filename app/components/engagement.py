@@ -90,15 +90,15 @@ class Video(CMSComponent):
 
     def transform(self):
         self.url = self.df[self.df["media_item_id"] == self.id]["url_1"].item()
-        length = self.video[self.video["media_item_id"] == self.id]["duration"].item()
-
-        if np.isnan(length):
+        try:
+            length = self.video[self.video["media_item_id"] == self.id][
+                "duration"
+            ].item()
+            self.start = int(length * (self.minPercent / 100))
+            self.end = int(length * (self.maxPercent / 100))
+        except:
             self.start = 0
             self.end = 5000
-            return
-
-        self.start = int(length * (self.minPercent / 100))
-        self.end = int(length * (self.maxPercent / 100))
 
     def display(self):
         video = html.Video(
@@ -164,16 +164,18 @@ class EmotionGraph(CMSComponent):
         self.key = key
 
     def load(self, data):
+        # NOTE Emoji scared and suprsied might need to be changed back to ouch and omg
+
         self.avgs = {
             "HOT_OR_NOT": {
                 "hot": 13027392,
                 "not": 1356411,
             },
             "EMOJI": {
-                "omg": 3287942,
+                "suprised": 3287942,
                 "joy": 3694890,
                 "excited": 4574767,
-                "ouch": 750170,
+                "scared": 750170,
                 "angry": 626166,
                 "sad": 783843,
             },
@@ -184,13 +186,21 @@ class EmotionGraph(CMSComponent):
         self.video = pd.read_json(data["video_info"])
 
     def transform(self):
-        length = self.video[self.video["media_item_id"] == self.id]["duration"].item()
+        # NOTE Emoji scared and suprsied might need to be changed back to ouch and omg
 
-        if np.isnan(length):
-            length = 5000
+        self.df.replace(
+            to_replace=["ouch", "omg"], value=["scared", "suprised"], inplace=True
+        )
 
-        self.start = int(length * (self.minPercent / 100))
-        self.end = int(length * (self.maxPercent / 100))
+        try:
+            length = self.video[self.video["media_item_id"] == self.id][
+                "duration"
+            ].item()
+            self.start = int(length * (self.minPercent / 100))
+            self.end = int(length * (self.maxPercent / 100))
+        except:
+            self.start = 0
+            self.end = 5000
 
         self.df = self.df[
             (self.df["timestamp"] >= self.start) & (self.df["timestamp"] <= self.end)
