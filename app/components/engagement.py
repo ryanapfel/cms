@@ -210,7 +210,7 @@ class EmotionGraph(CMSComponent):
         )
         norms = pd.DataFrame(self.avgs[self.key], index=["count"]).T
         norms["normalized"] = norms["count"] / norms["count"].sum()
-        self.normvals = (norms["normalized"] - self.vals) * 100
+        self.normvals = (self.vals - norms["normalized"]) * 100
 
     def display(self, graphType):
         idComp = f"self.componentId-{graphType}"
